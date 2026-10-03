@@ -8,7 +8,26 @@ Provisioning credentials identified as the authenticated AWS account root. Those
 
 Before provisioning, all 15 Lightsail regions within the account's 17 enabled AWS regions had no instances, static IPs, instance/disk snapshots, extra disks, databases, load balancers, containers or buckets. Regional resource-tag searches found no GF Dad matches. Route 53 had no zones. Existing S3, CloudFormation and EC2 resources identified in us-east-1 belonged to an unrelated project and were untouched. Tag searches are not an exhaustive inventory of untagged AWS resources.
 
-`MerakiFoundry/GF_Dad` contains recipe Markdown, templates and documentation only. `Schiavo-Enterprises/GF` contains an older ZIP of recipe material, also without application code. The other visible repository, `site-insight`, is an unrelated application. No GF Dad website repository was identified among accessible repositories. No Node, Docker, database or application systemd service was installed. When Lovable or another tool produces the website, inspect its build, SSR and server-function requirements first.
+`MerakiFoundry/GF_Dad` contains recipe Markdown, templates and documentation only. `Schiavo-Enterprises/GF` contains an older ZIP of recipe material, also without application code. The other visible repository, `site-insight`, is an unrelated application. No GF Dad website repository was identified among accessible repositories. The initial foundation had no application runtime. At the user’s subsequent request, Node.js 24 LTS and build tools were added as described below. No Docker, database or application systemd service is installed. When Lovable or another tool produces the website, inspect its build, SSR and server-function requirements first.
+
+## Application build tools
+
+Added October 2, 2026 at the user’s request; this supersedes the initial decision to defer Node installation.
+
+- Node.js **24.21.0 LTS (Krypton)** with bundled npm **11.19.0** and npx.
+- Official Linux x64 archive installed under `/opt/node/node-v24.21.0-linux-x64`; `/opt/node/current` selects the version, and `/usr/local/bin` provides node/npm/npx.
+- Download verified against the SHA-256 manifest retrieved from nodejs.org over HTTPS. Node updates are deliberate: Ubuntu unattended-upgrades does not update this installation. Check Node security releases and update the pinned installer/version after compatibility tests.
+- Ubuntu `build-essential` (GCC/G++/make), Python 3, pkg-config, CA certificates, xz, unzip, Git, curl and rsync.
+- A 2 GB swap file at `/swapfile-gfdad`, mode 0600, enabled persistently via `/etc/fstab`, swappiness 10. It consumes existing SSD capacity with no additional AWS charge. Swap helps absorb memory spikes but does not make large builds fast or guarantee they fit.
+- Writable build/source directories: `/var/www/gfdad/source` and `/var/www/gfdad/builds`, owned by gfdad and outside Nginx’s document root.
+
+Reproduce this addition by uploading `infra/lightsail/install-app-tools.sh` to `/tmp/` and running `sudo bash /tmp/install-app-tools.sh` after the baseline bootstrap.
+
+Run package installation and builds as **gfdad**, never root. For an actual npm application, commit `.nvmrc` containing `24.21.0`, declare its Node engine/package-manager requirements, commit `package-lock.json`, and use `npm ci` followed by the application’s documented build/test commands. These files belong in the future application repository; they are not being added to the recipe collection. If the application uses pnpm, Yarn or Bun, install the exact package manager specified by that repository instead of replacing its lockfile.
+
+Verified as gfdad: npm dependency installation and clean `npm ci`, TypeScript bundling with esbuild, execution of the resulting JavaScript, and compilation/execution of a small native C program. Temporary test files were removed. npm reported an unapproved esbuild install script; the test used the downloaded platform package successfully without broadly allowing lifecycle scripts. Review required package install scripts for the real application. Swap is active with root-only permissions, Nginx health still passes, and no new public listeners were added.
+
+Nginx, Certbot and systemd are already available for hosting. No framework, development server, dummy application, paid service or additional public port was added. A production app service, proxy route and application-aware health check must be configured against the actual server entry point. Prefer workstation/CI builds for larger applications on this 1 GB instance.
 
 ## Created resources and cost
 
@@ -87,7 +106,7 @@ curl --fail -H 'Host: gfdad.com' http://18.206.101.202/
 
 Validate actual pages/assets too: `/health` alone does not prove artifact correctness. To roll back, run `gfdad-deploy-static PREVIOUS_RELEASE_ID`. Keep immutable, unique release directories and remove old artifacts only after reviewing them. No privileged restart is needed for static deployment. No SPA fallback or long-lived asset cache is assumed until the actual router and hashed-asset conventions are known.
 
-For Node/TanStack Start, first inspect SSR/server functions and the production server entry point. Install its supported Node LTS only then, build outside this 1 GB instance where practical, use a systemd unit with `User=gfdad`, and bind to `127.0.0.1:3000`. Replace the Nginx static location with an appropriate reverse proxy. Do not use a development server. Reassess memory using real measurements before selecting 2 GB.
+For Node/TanStack Start, first inspect SSR/server functions and the production server entry point. Node.js 24 LTS is available; confirm that the application supports it. Build outside this 1 GB instance where practical, use a systemd unit with `User=gfdad`, and bind to `127.0.0.1:3000`. Replace the Nginx static location with an appropriate reverse proxy. Do not use a development server. Reassess memory using real measurements before selecting 2 GB.
 
 No GitHub Actions workflow is enabled because no application/build exists. The manual artifact path above needs no AWS credentials. A future SSH workflow would need `LIGHTSAIL_HOST`, `LIGHTSAIL_USER`, `LIGHTSAIL_SSH_KEY` (a dedicated deployment key, not the administrator key), and `LIGHTSAIL_KNOWN_HOSTS` pinned from a trusted admin connection. Use a runner with a stable, explicitly allowed egress IP; standard GitHub-hosted runners cannot connect through the current home-IP-only rule. Do not solve that by globally exposing SSH or placing root AWS credentials in GitHub.
 
