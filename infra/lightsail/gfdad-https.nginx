@@ -1,0 +1,34 @@
+# Activate only AFTER both DNS names point here and Certbot issues the certificate.
+server {
+    listen 80 default_server;
+    server_name gfdad.com www.gfdad.com;
+    location ^~ /.well-known/acme-challenge/ { root /var/www/letsencrypt; }
+    location / { return 301 https://gfdad.com$request_uri; }
+}
+server {
+    listen 443 ssl;
+    server_name www.gfdad.com;
+    ssl_certificate /etc/letsencrypt/live/gfdad.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/gfdad.com/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    return 301 https://gfdad.com$request_uri;
+}
+server {
+    listen 443 ssl;
+    server_name gfdad.com;
+    ssl_certificate /etc/letsencrypt/live/gfdad.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/gfdad.com/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    root /var/www/gfdad/current;
+    index index.html;
+    access_log /var/log/nginx/gfdad-access.log;
+    error_log /var/log/nginx/gfdad-error.log;
+    add_header X-Content-Type-Options nosniff always;
+    add_header Referrer-Policy strict-origin-when-cross-origin always;
+    add_header X-Frame-Options SAMEORIGIN always;
+    gzip on;
+    gzip_types text/css application/javascript application/json image/svg+xml;
+    location ~ /\. { deny all; }
+    location = /health { default_type text/plain; return 200 "web-ready\n"; }
+    location / { try_files $uri $uri/ =503; }
+}
